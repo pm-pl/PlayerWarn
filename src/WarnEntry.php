@@ -33,19 +33,19 @@ class WarnEntry {
 
 	public static function fromArray(array $data) : ?self {
 		if (
-			isset($data['player'], $data['reason'], $data['source'])
-			&& is_string($data['player']) && is_string($data['reason']) && is_string($data['source'])
-		) {
-			$playerName = $data['player'];
-			$reason = $data['reason'];
-			$source = $data['source'];
+                     isset($data['player'], $data['reason'], $data['source'])
+                     && is_string($data['player']) && is_string($data['reason']) && is_string($data['source'])
+                          ) {
+                     $playerName = $data['player'];
+                     $reason = $data['reason'];
+                     $source = $data['source'];
 
-			$expiration = isset($data['expiration']) ? (strtolower($data['expiration']) !== 'never' ? new \DateTime($data['expiration']) : null) : null;
+                     $expiration = isset($data['expiration']) ? (strtolower($data['expiration']) !== 'never' ? new \DateTime($data['expiration']) : null) : null;
 
-			return new self($playerName, $reason, $source, $expiration);
-		}
+                    return new self($playerName, $reason, $source, $expiration);
+                      }
 
-		return null;
+                    return null;
 	}
 
 	public function getPlayerName() : string {
