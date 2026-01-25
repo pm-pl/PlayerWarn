@@ -31,7 +31,7 @@ declare(strict_types = 1);
  * ------------------------------------------------------------------------
  */
 
-namespace aiptu\playerwarn\libs\_f62387c89eb71dd4\JackMD\UpdateNotifier\task;
+namespace aiptu\playerwarn\libs\_00bc7043befb6800\JackMD\UpdateNotifier\task;
 
 use pocketmine\plugin\ApiVersion;
 use pocketmine\scheduler\AsyncTask;
