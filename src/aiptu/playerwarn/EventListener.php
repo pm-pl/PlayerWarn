@@ -15,6 +15,7 @@ namespace aiptu\playerwarn;
 
 use aiptu\playerwarn\event\PlayerPunishmentEvent;
 use aiptu\playerwarn\event\WarnAddEvent;
+use aiptu\playerwarn\event\WarnEditEvent;
 use aiptu\playerwarn\event\WarnExpiredEvent;
 use aiptu\playerwarn\event\WarnRemoveEvent;
 use pocketmine\event\Listener;
@@ -33,13 +34,25 @@ class EventListener implements Listener {
 		$player = $event->getPlayer();
 		$playerName = $player->getName();
 
+		$pendingManager = $this->plugin->getPendingPunishmentManager();
+		if ($pendingManager->hasPending($playerName)) {
+			$pendingPunishments = $pendingManager->getPending($playerName);
+
+			foreach ($pendingPunishments as $punishment) {
+				$this->plugin->getPunishmentService()->scheduleDelayedPunishment(
+					$player,
+					$punishment['type'],
+					$punishment['issuer'],
+					$punishment['reason']
+				);
+			}
+
+			$pendingManager->clear($playerName);
+		}
+
 		$this->plugin->getProvider()->getWarningCount(
 			$playerName,
 			function (int $currentWarningCount) use ($player, $playerName) : void {
-				if (!$player->isOnline()) {
-					return;
-				}
-
 				$tracker = $this->plugin->getWarningTracker();
 				$lastWarningCount = $tracker->getLastCount($playerName);
 
@@ -71,22 +84,6 @@ class EventListener implements Listener {
 				);
 			}
 		);
-
-		$pendingManager = $this->plugin->getPendingPunishmentManager();
-		if ($pendingManager->hasPending($playerName)) {
-			$pendingPunishments = $pendingManager->getPending($playerName);
-
-			foreach ($pendingPunishments as $punishment) {
-				$this->plugin->getPunishmentService()->scheduleDelayedPunishment(
-					$player,
-					$punishment['type'],
-					$punishment['issuer'],
-					$punishment['reason']
-				);
-			}
-
-			$pendingManager->clear($playerName);
-		}
 	}
 
 	public function onWarnAdd(WarnAddEvent $event) : void {
@@ -100,6 +97,18 @@ class EventListener implements Listener {
 		$discordService = $this->plugin->getDiscordService();
 		if ($discordService !== null) {
 			$discordService->sendWarningRemoved($event->getWarnEntry());
+		}
+	}
+
+	public function onWarnEdit(WarnEditEvent $event) : void {
+		$discordService = $this->plugin->getDiscordService();
+		if ($discordService !== null) {
+			$discordService->sendWarningEdited(
+				$event->getWarnEntry(),
+				$event->getEditType(),
+				$event->getOldValue(),
+				$event->getNewValue()
+			);
 		}
 	}
 
