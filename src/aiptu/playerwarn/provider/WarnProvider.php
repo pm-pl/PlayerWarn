@@ -21,7 +21,8 @@ use aiptu\playerwarn\utils\Utils;
 use aiptu\playerwarn\warns\WarnEntry;
 use Closure;
 use DateTimeImmutable;
-use aiptu\playerwarn\libs\_9760f14a5515c734\poggit\libasynql\DataConnector;
+use aiptu\playerwarn\libs\_c6d89496690f5200\poggit\libasynql\DataConnector;
+use function count;
 use function strtolower;
 
 class WarnProvider {
@@ -120,19 +121,41 @@ class WarnProvider {
 	) : void {
 		$normalizedName = strtolower($playerName);
 
-		$this->database->executeChange('warn.remove_id', [
+		$this->database->executeSelect('warn.get_id', [
 			'id' => $id,
 			'player_name' => $normalizedName,
-		], function (int $affectedRows) use ($normalizedName, $onSuccess) : void {
-			if ($affectedRows > 0) {
-				$this->cache->invalidate("warn_count:{$normalizedName}");
-				$this->cache->invalidate("warn_list:{$normalizedName}");
+		], function (array $rows) use ($normalizedName, $id, $onSuccess, $onError) : void {
+			$warnEntry = null;
+			if (count($rows) > 0) {
+				$row = $rows[0];
+				$warnEntry = new WarnEntry(
+					(int) $row['id'],
+					$row['player_name'],
+					$row['reason'],
+					$row['source'],
+					$row['expiration'] !== null ? new DateTimeImmutable($row['expiration']) : null,
+					new DateTimeImmutable($row['timestamp'])
+				);
 			}
 
-			if ($onSuccess !== null) {
-				$onSuccess($affectedRows);
-			}
-		}, $this->wrapErrorHandler($onError, "Failed to remove warning ID {$id}"));
+			$this->database->executeChange('warn.remove_id', [
+				'id' => $id,
+				'player_name' => $normalizedName,
+			], function (int $affectedRows) use ($normalizedName, $warnEntry, $onSuccess) : void {
+				if ($affectedRows > 0) {
+					$this->cache->invalidate("warn_count:{$normalizedName}");
+					$this->cache->invalidate("warn_list:{$normalizedName}");
+
+					if ($warnEntry !== null) {
+						(new WarnRemoveEvent($warnEntry))->call();
+					}
+				}
+
+				if ($onSuccess !== null) {
+					$onSuccess($affectedRows);
+				}
+			}, $this->wrapErrorHandler($onError, "Failed to remove warning ID {$id}"));
+		}, $this->wrapErrorHandler($onError, "Failed to fetch warning ID {$id}"));
 	}
 
 	/**
@@ -171,7 +194,7 @@ class WarnProvider {
 
 	/**
 	 * Retrieves the count of warnings for a player.
-	 * Uses cache to minimize database queries (5 minute TTL).
+	 * Uses cache to minimize database queries.
 	 */
 	public function getWarningCount(
 		string $playerName,
@@ -232,6 +255,34 @@ class WarnProvider {
 				$onSuccess($warns);
 			}
 		}, $this->wrapErrorHandler($onError, 'Failed to fetch expired warnings'));
+	}
+
+	/**
+	 * Retrieves all players with active warnings and their warning counts.
+	 */
+	public function getAllPlayersWithWarnings(
+		?Closure $onSuccess = null,
+		?Closure $onError = null
+	) : void {
+		$this->database->executeSelect('warn.get_all_players', [], function (array $rows) use ($onSuccess) : void {
+			$playersData = [];
+
+			foreach ($rows as $row) {
+				try {
+					$playersData[] = [
+						'player' => $row['player_name'],
+						'count' => (int) $row['count'],
+						'last_warning' => new DateTimeImmutable($row['last_warning']),
+					];
+				} catch (\Throwable $e) {
+					$this->logger->error('Failed to parse player warning data: ' . $e->getMessage());
+				}
+			}
+
+			if ($onSuccess !== null) {
+				$onSuccess($playersData);
+			}
+		}, $this->wrapErrorHandler($onError, 'Failed to fetch all players with warnings'));
 	}
 
 	/**

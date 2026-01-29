@@ -78,8 +78,29 @@ class WarnCommand extends Command implements PluginOwned {
 			return true;
 		}
 
+		if ($target === null) {
+			$offlinePlayer = $server->getOfflinePlayer($playerName);
+			if ($offlinePlayer !== null) {
+				$offlinePlayerName = $offlinePlayer->getName();
+				if ($this->hasOfflineBypassPermission($offlinePlayerName)) {
+					$sender->sendMessage(TextFormat::RED . 'You cannot warn this player (has bypass permission).');
+					return true;
+				}
+			}
+		}
+
 		$this->addWarning($playerName, $reason, $sender, $expiration);
 		return true;
+	}
+
+	/**
+	 * Check if an offline player has bypass permission.
+	 * This checks if the player is an operator or has explicit bypass permission.
+	 */
+	private function hasOfflineBypassPermission(string $playerName) : bool {
+		return $this->plugin->getServer()->isOp($playerName);
+		// TODO: Add support for permission plugin integration
+		// For now, we rely on op status for offline players
 	}
 
 	/**
@@ -167,7 +188,7 @@ class WarnCommand extends Command implements PluginOwned {
 		if ($this->plugin->isBroadcastToEveryoneEnabled()) {
 			$this->plugin->getServer()->broadcastMessage(
 				TextFormat::LIGHT_PURPLE . $entry->getPlayerName() . TextFormat::YELLOW . ' has been warned for: ' .
-				TextFormat::LIGHT_PURPLE . $entry->getReason() . ' by ' . TextFormat::LIGHT_PURPLE . $sender->getName()
+				TextFormat::LIGHT_PURPLE . $entry->getReason() . TextFormat::YELLOW . ' by ' . TextFormat::LIGHT_PURPLE . $sender->getName()
 			);
 		}
 	}
@@ -225,11 +246,14 @@ class WarnCommand extends Command implements PluginOwned {
 		);
 
 		if ($player instanceof Player) {
+			$tempbanDuration = $this->plugin->getTempbanDuration();
+
 			$this->plugin->getPunishmentService()->scheduleDelayedPunishment(
 				$player,
 				$punishmentType,
 				$sender->getName(),
-				$entry->getReason()
+				$entry->getReason(),
+				$tempbanDuration
 			);
 		} else {
 			$this->plugin->getPendingPunishmentManager()->add(
@@ -255,6 +279,6 @@ class WarnCommand extends Command implements PluginOwned {
 		$duration = Utils::formatDuration($secondsRemaining);
 		$date = $expiration->format(Utils::DATE_TIME_FORMAT);
 
-		return "{$duration} ({$date})";
+		return "until {$duration} ({$date})";
 	}
 }
