@@ -21,7 +21,7 @@ use aiptu\playerwarn\utils\Utils;
 use aiptu\playerwarn\warns\WarnEntry;
 use Closure;
 use DateTimeImmutable;
-use aiptu\playerwarn\libs\_ddf7f2ffe8844bab\poggit\libasynql\DataConnector;
+use aiptu\playerwarn\libs\_cdc3954195444393\poggit\libasynql\DataConnector;
 use function count;
 use function explode;
 use function strtolower;
